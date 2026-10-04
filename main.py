@@ -1,4 +1,12 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+
+
+BASE_DIR = Path(__file__).resolve().parent
+FRONTEND_DIR = BASE_DIR / "frontend"
+
 
 app = FastAPI(
     title="FlexGrid API",
@@ -7,13 +15,9 @@ app = FastAPI(
 )
 
 
-@app.get("/")
+@app.get("/", response_class=FileResponse)
 def root():
-    return {
-        "project": "FlexGrid",
-        "status": "online",
-        "message": "FlexGrid API is running"
-    }
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
 @app.get("/health")
