@@ -28,6 +28,20 @@ METRICS_FILE = OUTPUT_DIR / "metrics.csv"
 
 
 # ============================================================
+# THEME TOKENS
+# ============================================================
+
+YELLOW = "#FFC21A"
+YELLOW_SOFT = "#FFF4CC"
+INK = "#14120B"
+MUTED = "#7A776C"
+LINE = "#ECEAE3"
+BG = "#F5F4F0"
+GREEN = "#22A06B"
+GREY_LINE = "#B9B6AA"
+
+
+# ============================================================
 # LOAD DATA
 # ============================================================
 
@@ -55,12 +69,11 @@ except Exception as e:
 
 
 # ============================================================
-# HELPER
+# HELPERS
 # ============================================================
 
 def metric_value(name, default=0):
     value = metrics.get(name, default)
-
     try:
         return float(value)
     except (ValueError, TypeError):
@@ -71,206 +84,270 @@ def format_number(value, decimals=1):
     return f"{value:,.{decimals}f}"
 
 
+def style_chart(fig, title=None, height=380, y_title="", y_range=None):
+    """Apply one consistent look to every chart."""
+    fig.update_layout(
+        title=dict(
+            text=title,
+            font=dict(size=16, color=INK, family="Plus Jakarta Sans"),
+            x=0.01,
+        ) if title else None,
+        height=height,
+        margin=dict(l=10, r=10, t=55 if title else 20, b=10),
+        hovermode="x unified",
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font=dict(family="Plus Jakarta Sans", color=MUTED, size=12),
+        legend=dict(
+            orientation="h", y=1.12 if title else 1.08, x=1, xanchor="right",
+            font=dict(size=12, color=INK),
+        ),
+        hoverlabel=dict(bgcolor=INK, font_color="white", bordercolor=INK),
+        xaxis=dict(showgrid=False, showline=True, linecolor=LINE, title=None),
+        yaxis=dict(
+            gridcolor=LINE, zeroline=False, title=y_title,
+            range=y_range,
+        ),
+    )
+    return fig
+
+
+def line(fig, x, y, name, color, width=2.5, fill=None, dash=None):
+    fig.add_trace(
+        go.Scatter(
+            x=x, y=y, name=name, mode="lines",
+            line=dict(width=width, color=color, dash=dash, shape="spline", smoothing=0.4),
+            fill=fill,
+            fillcolor="rgba(255,194,26,0.18)" if fill else None,
+        )
+    )
+
+
+def show(fig):
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def section(title, description=""):
+    st.markdown(
+        f'<div class="section-title">{title}</div>'
+        f'<div class="section-description">{description}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def insight(title, text):
+    st.markdown(
+        f"""
+        <div class="insight">
+            <div class="insight-icon">⚡</div>
+            <div>
+                <div class="insight-title">{title}</div>
+                <div class="insight-text">{text}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def stat_card(label, value, unit, desc, icon):
+    return f"""
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <div class="kpi-label">{label}</div>
+            <div class="kpi-icon">{icon}</div>
+        </div>
+        <div class="kpi-value">{value}<span class="kpi-unit">{unit}</span></div>
+        <div class="kpi-description">{desc}</div>
+    </div>
+    """
+
+
 # ============================================================
 # CUSTOM CSS
 # ============================================================
 
 st.markdown(
-    """
+    f"""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+    html, body, [class*="css"], .stApp, button, input {{
+        font-family: 'Plus Jakarta Sans', sans-serif;
+    }}
 
     /* ---------- GLOBAL ---------- */
+    .stApp {{ background-color: {BG}; }}
+    header[data-testid="stHeader"] {{ background: transparent; }}
+    #MainMenu, footer {{ visibility: hidden; }}
 
-    .stApp {
-        background-color: #f5f7fa;
-    }
-
-    .block-container {
-        padding-top: 2rem;
+    .block-container {{
+        padding-top: 2.2rem;
         padding-bottom: 3rem;
-        max-width: 1500px;
-    }
+        max-width: 1450px;
+    }}
+
+    /* Charts sit inside white rounded cards */
+    div[data-testid="stPlotlyChart"] {{
+        background: white;
+        border: 1px solid {LINE};
+        border-radius: 20px;
+        padding: 14px 10px 4px 10px;
+        overflow: hidden;
+    }}
 
     /* ---------- SIDEBAR ---------- */
+    section[data-testid="stSidebar"] {{
+        background-color: {INK};
+        border-right: none;
+    }}
+    section[data-testid="stSidebar"] * {{ color: #e9e6dc; }}
 
-    section[data-testid="stSidebar"] {
-        background-color: #101827;
-    }
+    .sidebar-brand {{
+        display: flex; align-items: center; gap: 12px;
+        padding: 6px 4px 8px 4px;
+    }}
+    .brand-symbol {{
+        width: 42px; height: 42px; border-radius: 14px;
+        background: {YELLOW};
+        display: flex; align-items: center; justify-content: center;
+        font-size: 22px;
+    }}
+    .brand-name {{ font-size: 21px; font-weight: 800; color: white !important; line-height: 1.1; }}
+    .brand-subtitle {{ color: #8d897b !important; font-size: 11px; line-height: 1.4; }}
 
-    section[data-testid="stSidebar"] * {
-        color: #e8edf5;
-    }
+    .sidebar-section {{
+        color: #7d7a6d !important;
+        font-size: 12px; font-weight: 600;
+        margin: 30px 0 10px 4px;
+    }}
 
-    .sidebar-brand {
-        padding: 10px 5px 25px 5px;
-    }
+    /* Navigation radio -> pill menu */
+    section[data-testid="stSidebar"] div[role="radiogroup"] {{ gap: 6px; }}
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {{
+        width: 100%;
+        padding: 11px 14px;
+        border-radius: 14px;
+        cursor: pointer;
+        transition: background .15s ease;
+    }}
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{
+        background: #24211a;
+    }}
+    section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {{
+        display: none;  /* hide radio circle */
+    }}
+    section[data-testid="stSidebar"] div[role="radiogroup"] label p {{
+        font-size: 14px; font-weight: 600;
+    }}
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {{
+        background: {YELLOW};
+    }}
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {{
+        color: {INK} !important; font-weight: 800;
+    }}
 
-    .brand-symbol {
-        font-size: 32px;
-        font-weight: 800;
-        color: #f5b942;
-    }
-
-    .brand-name {
-        font-size: 24px;
-        font-weight: 800;
-        color: white;
-        margin-top: -4px;
-    }
-
-    .brand-subtitle {
-        color: #94a3b8;
-        font-size: 12px;
-        line-height: 1.5;
-        margin-top: 5px;
-    }
-
-    .sidebar-section {
-        color: #64748b;
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 1.5px;
-        margin-top: 28px;
-        margin-bottom: 8px;
-    }
+    section[data-testid="stSidebar"] div[data-testid="stAlert"] {{
+        background: #1f2a22; border: 1px solid #2c4434; border-radius: 14px;
+    }}
 
     /* ---------- HEADER ---------- */
-
-    .eyebrow {
-        color: #64748b;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 1.5px;
-        text-transform: uppercase;
-        margin-bottom: 5px;
-    }
-
-    .page-title {
-        color: #111827;
-        font-size: 38px;
-        font-weight: 800;
-        letter-spacing: -1px;
-        margin: 0;
-    }
-
-    .page-subtitle {
-        color: #64748b;
-        font-size: 15px;
-        margin-top: 8px;
-        margin-bottom: 24px;
-    }
-
-    .status-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        background: #ecfdf5;
-        color: #047857;
-        border: 1px solid #a7f3d0;
-        border-radius: 20px;
-        padding: 7px 13px;
-        font-size: 12px;
-        font-weight: 700;
-    }
-
-    .status-dot {
-        width: 8px;
-        height: 8px;
-        background: #10b981;
-        border-radius: 50%;
-        display: inline-block;
-    }
+    .page-title {{
+        color: {INK}; font-size: 36px; font-weight: 800;
+        letter-spacing: -1px; margin: 0; line-height: 1.15;
+    }}
+    .page-subtitle {{
+        color: {MUTED}; font-size: 15px;
+        margin: 8px 0 26px 0; max-width: 680px; line-height: 1.55;
+    }}
+    .status-pill {{
+        display: inline-flex; align-items: center; gap: 8px;
+        background: {INK}; color: white;
+        border-radius: 30px; padding: 9px 16px;
+        font-size: 12px; font-weight: 700;
+    }}
+    .status-dot {{
+        width: 8px; height: 8px; background: {YELLOW};
+        border-radius: 50%; display: inline-block;
+        box-shadow: 0 0 0 4px rgba(255,194,26,.25);
+    }}
 
     /* ---------- KPI CARDS ---------- */
-
-    .kpi-card {
+    .kpi-card {{
         background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 14px;
-        padding: 20px;
-        min-height: 125px;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-    }
+        border: 1px solid {LINE};
+        border-radius: 20px;
+        padding: 20px 22px;
+        min-height: 150px;
+    }}
+    .kpi-top {{ display: flex; justify-content: space-between; align-items: center; }}
+    .kpi-label {{ color: {MUTED}; font-size: 13px; font-weight: 600; }}
+    .kpi-icon {{
+        width: 34px; height: 34px; border-radius: 50%;
+        background: {YELLOW_SOFT};
+        display: flex; align-items: center; justify-content: center;
+        font-size: 15px;
+    }}
+    .kpi-value {{
+        color: {INK}; font-size: 34px; font-weight: 800;
+        letter-spacing: -1px; margin-top: 14px;
+    }}
+    .kpi-unit {{ color: {MUTED}; font-size: 14px; font-weight: 600; margin-left: 5px; letter-spacing: 0; }}
+    .kpi-description {{ color: #a09d90; font-size: 12px; margin-top: 6px; }}
 
-    .kpi-label {
-        color: #64748b;
-        font-size: 12px;
-        font-weight: 600;
-        margin-bottom: 10px;
-    }
+    /* Highlighted (hero) KPI */
+    .kpi-card.hero {{ background: {YELLOW}; border-color: {YELLOW}; }}
+    .kpi-card.hero .kpi-label {{ color: rgba(20,18,11,.7); }}
+    .kpi-card.hero .kpi-icon {{ background: {INK}; color: {YELLOW}; }}
+    .kpi-card.hero .kpi-unit {{ color: rgba(20,18,11,.65); }}
+    .kpi-card.hero .kpi-description {{ color: rgba(20,18,11,.6); }}
 
-    .kpi-value {
-        color: #111827;
-        font-size: 29px;
-        font-weight: 800;
-        letter-spacing: -0.5px;
-    }
+    /* ---------- SECTIONS ---------- */
+    .section-title {{
+        color: {INK}; font-size: 22px; font-weight: 800;
+        letter-spacing: -.4px; margin-top: 34px; margin-bottom: 4px;
+    }}
+    .section-description {{
+        color: {MUTED}; font-size: 14px; margin-bottom: 16px; max-width: 720px; line-height: 1.5;
+    }}
 
-    .kpi-unit {
-        color: #64748b;
-        font-size: 13px;
-        font-weight: 500;
-    }
+    /* ---------- STREAMLIT METRICS AS CARDS ---------- */
+    div[data-testid="stMetric"] {{
+        background: white; border: 1px solid {LINE};
+        border-radius: 20px; padding: 18px 22px;
+    }}
+    div[data-testid="stMetricLabel"] p {{ color: {MUTED}; font-size: 13px; font-weight: 600; }}
+    div[data-testid="stMetricValue"] {{ color: {INK}; font-weight: 800; font-size: 30px; letter-spacing: -.8px; }}
 
-    .kpi-description {
-        color: #94a3b8;
-        font-size: 11px;
-        margin-top: 8px;
-    }
+    /* ---------- INSIGHT ---------- */
+    .insight {{
+        display: flex; gap: 16px; align-items: flex-start;
+        background: {INK}; border-radius: 20px;
+        padding: 20px 24px; margin: 22px 0 6px 0;
+    }}
+    .insight-icon {{
+        flex: none; width: 38px; height: 38px; border-radius: 12px;
+        background: {YELLOW}; display: flex; align-items: center; justify-content: center;
+    }}
+    .insight-title {{ font-weight: 800; color: white; font-size: 15px; }}
+    .insight-text {{ color: #b7b3a5; font-size: 13.5px; margin-top: 4px; line-height: 1.6; }}
+    .insight-text b {{ color: {YELLOW}; }}
 
-    /* ---------- SECTION ---------- */
-
-    .section-title {
-        color: #111827;
-        font-size: 21px;
-        font-weight: 750;
-        margin-top: 28px;
-        margin-bottom: 4px;
-    }
-
-    .section-description {
-        color: #64748b;
-        font-size: 13px;
-        margin-bottom: 15px;
-    }
-
-    /* ---------- INSIGHT CARD ---------- */
-
-    .insight {
-        background: white;
-        border-left: 4px solid #f5b942;
-        border-radius: 10px;
-        padding: 16px 18px;
-        margin: 10px 0;
-        border-top: 1px solid #e5e7eb;
-        border-right: 1px solid #e5e7eb;
-        border-bottom: 1px solid #e5e7eb;
-    }
-
-    .insight-title {
-        font-weight: 750;
-        color: #111827;
-        font-size: 14px;
-    }
-
-    .insight-text {
-        color: #64748b;
-        font-size: 13px;
-        margin-top: 4px;
-        line-height: 1.5;
-    }
+    /* ---------- BUTTON / TABLE ---------- */
+    .stDownloadButton button {{
+        background: {INK}; color: white; border: none;
+        border-radius: 30px; padding: 10px 24px; font-weight: 700;
+    }}
+    .stDownloadButton button:hover {{ background: {YELLOW}; color: {INK}; }}
+    div[data-testid="stDataFrame"] {{
+        border: 1px solid {LINE}; border-radius: 16px; overflow: hidden;
+    }}
 
     /* ---------- FOOTER ---------- */
-
-    .footer {
-        text-align: center;
-        color: #94a3b8;
-        font-size: 11px;
-        margin-top: 40px;
-        padding-top: 20px;
-        border-top: 1px solid #e5e7eb;
-    }
-
+    .footer {{
+        text-align: center; color: #a09d90; font-size: 12px;
+        margin-top: 48px; padding-top: 20px; border-top: 1px solid {LINE};
+    }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -287,49 +364,33 @@ with st.sidebar:
         """
         <div class="sidebar-brand">
             <div class="brand-symbol">⚡</div>
-            <div class="brand-name">FlexGrid</div>
-            <div class="brand-subtitle">
-                Neighbourhood Energy Flexibility Platform
+            <div>
+                <div class="brand-name">FlexGrid</div>
+                <div class="brand-subtitle">Neighbourhood energy flexibility</div>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        '<div class="sidebar-section">NAVIGATION</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown('<div class="sidebar-section">Menu</div>', unsafe_allow_html=True)
 
     page = st.radio(
         "Navigation",
-        [
-            "Overview",
-            "Reliability",
-            "Battery",
-            "Flexible Loads",
-            "Simulation Data",
-        ],
+        ["Overview", "Reliability", "Battery", "Flexible Loads", "Simulation Data"],
         label_visibility="collapsed",
     )
 
-    st.markdown(
-        '<div class="sidebar-section">SIMULATION</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown('<div class="sidebar-section">Simulation</div>', unsafe_allow_html=True)
 
-    st.caption("Model status")
     st.success("Simulation data loaded")
 
     st.caption(
         f"Time horizon: "
-        f"{results['timestamp'].min().strftime('%d %b')} → "
+        f"{results['timestamp'].min().strftime('%d %b')} to "
         f"{results['timestamp'].max().strftime('%d %b')}"
     )
-
-    st.caption(
-        f"Intervals: {len(results)}"
-    )
+    st.caption(f"Intervals: {len(results)}")
 
 
 # ============================================================
@@ -339,36 +400,22 @@ with st.sidebar:
 header_left, header_right = st.columns([4, 1])
 
 with header_left:
-
-    st.markdown(
-        '<div class="eyebrow">ENERGY OPERATIONS / SIMULATION</div>',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        '<div class="page-title">Neighbourhood Energy Control</div>',
-        unsafe_allow_html=True,
-    )
-
     st.markdown(
         """
+        <div class="page-title">Neighbourhood Energy Control</div>
         <div class="page-subtitle">
-        Forecast renewable availability, coordinate community storage,
-        shift flexible demand and protect local electricity supply.
+            Forecast renewable availability, coordinate community storage,
+            shift flexible demand and protect local electricity supply.
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 with header_right:
-
     st.markdown(
         """
-        <div style="text-align:right; padding-top:10px;">
-            <span class="status-pill">
-                <span class="status-dot"></span>
-                SIMULATION RUN
-            </span>
+        <div style="text-align:right; padding-top:8px;">
+            <span class="status-pill"><span class="status-dot"></span>Simulation run</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -379,106 +426,38 @@ with header_right:
 # KPI SECTION
 # ============================================================
 
-baseline_unmet = metric_value(
-    "Baseline unmet energy (kWh)"
-)
-
-flexgrid_unmet = metric_value(
-    "FlexGrid unmet energy (kWh)"
-)
-
-reduction = metric_value(
-    "Unmet energy reduction (%)"
-)
-
-availability = metric_value(
-    "FlexGrid supply availability (%)"
-)
-
-peak_demand = metric_value(
-    "Peak demand (kW)"
-)
-
-min_soc = metric_value(
-    "Battery minimum SOC (%)"
-)
-
-max_soc = metric_value(
-    "Battery maximum SOC (%)"
-)
-
-shifted_load = metric_value(
-    "Total shifted load (kWh)"
-)
-
+baseline_unmet = metric_value("Baseline unmet energy (kWh)")
+flexgrid_unmet = metric_value("FlexGrid unmet energy (kWh)")
+reduction = metric_value("Unmet energy reduction (%)")
+availability = metric_value("FlexGrid supply availability (%)")
+peak_demand = metric_value("Peak demand (kW)")
+min_soc = metric_value("Battery minimum SOC (%)")
+max_soc = metric_value("Battery maximum SOC (%)")
+shifted_load = metric_value("Total shifted load (kWh)")
 
 k1, k2, k3, k4 = st.columns(4)
 
 with k1:
     st.markdown(
-        f"""
-        <div class="kpi-card">
-            <div class="kpi-label">BASELINE UNMET ENERGY</div>
-            <div class="kpi-value">
-                {format_number(baseline_unmet)}
-                <span class="kpi-unit">kWh</span>
-            </div>
-            <div class="kpi-description">
-                Without coordinated flexibility
-            </div>
-        </div>
-        """,
+        stat_card("Baseline unmet energy", format_number(baseline_unmet), "kWh",
+                  "Without coordinated flexibility", "🔌"),
         unsafe_allow_html=True,
     )
-
 with k2:
     st.markdown(
-        f"""
-        <div class="kpi-card">
-            <div class="kpi-label">FLEXGRID UNMET ENERGY</div>
-            <div class="kpi-value">
-                {format_number(flexgrid_unmet)}
-                <span class="kpi-unit">kWh</span>
-            </div>
-            <div class="kpi-description">
-                After battery + load flexibility
-            </div>
-        </div>
-        """,
+        stat_card("FlexGrid unmet energy", format_number(flexgrid_unmet), "kWh",
+                  "After battery and load flexibility", "🔋"),
         unsafe_allow_html=True,
     )
-
 with k3:
-    st.markdown(
-        f"""
-        <div class="kpi-card">
-            <div class="kpi-label">UNMET ENERGY REDUCTION</div>
-            <div class="kpi-value">
-                {format_number(reduction)}
-                <span class="kpi-unit">%</span>
-            </div>
-            <div class="kpi-description">
-                Improvement versus baseline
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
+    card = stat_card("Unmet energy reduction", format_number(reduction), "%",
+                     "Improvement versus baseline", "📉")
+    st.markdown(card.replace('class="kpi-card"', 'class="kpi-card hero"'),
+                unsafe_allow_html=True)
 with k4:
     st.markdown(
-        f"""
-        <div class="kpi-card">
-            <div class="kpi-label">SUPPLY AVAILABILITY</div>
-            <div class="kpi-value">
-                {format_number(availability)}
-                <span class="kpi-unit">%</span>
-            </div>
-            <div class="kpi-description">
-                FlexGrid simulation result
-            </div>
-        </div>
-        """,
+        stat_card("Supply availability", format_number(availability), "%",
+                  "FlexGrid simulation result", "☀️"),
         unsafe_allow_html=True,
     )
 
@@ -489,160 +468,43 @@ with k4:
 
 if page == "Overview":
 
-    st.markdown(
-        '<div class="section-title">Neighbourhood Energy Balance</div>',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        """
-        <div class="section-description">
-        Renewable generation is compared with neighbourhood demand.
-        FlexGrid responds when available supply falls below demand.
-        </div>
-        """,
-        unsafe_allow_html=True,
+    section(
+        "Neighbourhood energy balance",
+        "Renewable generation compared with neighbourhood demand. "
+        "FlexGrid responds when available supply falls below demand.",
     )
 
     fig = go.Figure()
+    line(fig, results["timestamp"], results["solar_kw"], "Solar supply", YELLOW, fill="tozeroy")
+    line(fig, results["timestamp"], results["demand_kw"], "Demand", INK)
+    style_chart(fig, height=430, y_title="Power (kW)")
+    show(fig)
 
-    fig.add_trace(
-        go.Scatter(
-            x=results["timestamp"],
-            y=results["solar_kw"],
-            name="Solar Supply",
-            mode="lines",
-            line=dict(width=2.5),
-        )
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=results["timestamp"],
-            y=results["demand_kw"],
-            name="Demand",
-            mode="lines",
-            line=dict(width=2.5),
-        )
-    )
-
-    fig.update_layout(
-        height=430,
-        margin=dict(l=10, r=10, t=20, b=10),
-        hovermode="x unified",
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        xaxis_title="Time",
-        yaxis_title="Power (kW)",
-        legend=dict(
-            orientation="h",
-            y=1.08,
-            x=0,
-        ),
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-    )
-
-    # --------------------------------------------------------
-
-    st.markdown(
-        '<div class="section-title">Reliability Impact</div>',
-        unsafe_allow_html=True,
-    )
+    section("Reliability impact")
 
     c1, c2 = st.columns(2)
 
     with c1:
-
         fig = go.Figure()
-
-        fig.add_trace(
-            go.Scatter(
-                x=results["timestamp"],
-                y=results["baseline_shortfall_kw"],
-                name="Baseline",
-                mode="lines",
-                line=dict(width=2),
-            )
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=results["timestamp"],
-                y=results["flexgrid_unmet_kw"],
-                name="FlexGrid",
-                mode="lines",
-                line=dict(width=2),
-            )
-        )
-
-        fig.update_layout(
-            title="Shortfall Before vs After FlexGrid",
-            height=360,
-            margin=dict(l=10, r=10, t=45, b=10),
-            hovermode="x unified",
-            paper_bgcolor="white",
-            plot_bgcolor="white",
-            xaxis_title="Time",
-            yaxis_title="Unmet Power (kW)",
-        )
-
-        st.plotly_chart(
-            fig,
-            use_container_width=True,
-        )
+        line(fig, results["timestamp"], results["baseline_shortfall_kw"],
+             "Baseline", GREY_LINE, width=2)
+        line(fig, results["timestamp"], results["flexgrid_unmet_kw"],
+             "FlexGrid", YELLOW, width=2.5)
+        style_chart(fig, "Shortfall before vs after FlexGrid", 360, "Unmet power (kW)")
+        show(fig)
 
     with c2:
-
         fig = go.Figure()
+        line(fig, results["timestamp"], results["battery_soc"] * 100,
+             "Battery SOC", INK, fill="tozeroy")
+        style_chart(fig, "Community battery state of charge", 360, "SOC (%)", [0, 100])
+        show(fig)
 
-        fig.add_trace(
-            go.Scatter(
-                x=results["timestamp"],
-                y=results["battery_soc"] * 100,
-                name="Battery SOC",
-                mode="lines",
-                line=dict(width=2.5),
-                fill="tozeroy",
-            )
-        )
-
-        fig.update_layout(
-            title="Community Battery State of Charge",
-            height=360,
-            margin=dict(l=10, r=10, t=45, b=10),
-            paper_bgcolor="white",
-            plot_bgcolor="white",
-            xaxis_title="Time",
-            yaxis_title="SOC (%)",
-            yaxis=dict(range=[0, 100]),
-        )
-
-        st.plotly_chart(
-            fig,
-            use_container_width=True,
-        )
-
-    # --------------------------------------------------------
-
-    st.markdown(
-        f"""
-        <div class="insight">
-            <div class="insight-title">
-                FlexGrid intervention
-            </div>
-            <div class="insight-text">
-                The simulation reduced unmet energy by
-                <b>{format_number(reduction)}%</b>
-                compared with the baseline through coordinated
-                battery dispatch and flexible-load shifting.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    insight(
+        "FlexGrid intervention",
+        f"The simulation reduced unmet energy by <b>{format_number(reduction)}%</b> "
+        "compared with the baseline through coordinated battery dispatch "
+        "and flexible-load shifting.",
     )
 
 
@@ -652,97 +514,33 @@ if page == "Overview":
 
 elif page == "Reliability":
 
-    st.markdown(
-        '<div class="section-title">Reliability Analysis</div>',
-        unsafe_allow_html=True,
+    section(
+        "Reliability analysis",
+        "How FlexGrid responds to renewable intermittency and reduces electricity shortfalls.",
     )
 
-    st.markdown(
-        """
-        <div class="section-description">
-        Measures how FlexGrid responds to renewable intermittency
-        and reduces electricity shortfalls.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    baseline_availability = metric_value(
-        "Baseline supply availability (%)"
-    )
+    baseline_availability = metric_value("Baseline supply availability (%)")
 
     r1, r2, r3 = st.columns(3)
+    r1.metric("Baseline availability", f"{baseline_availability:.1f}%")
+    r2.metric("FlexGrid availability", f"{availability:.1f}%")
+    r3.metric("Unmet energy reduction", f"{reduction:.1f}%")
 
-    with r1:
-        st.metric(
-            "Baseline availability",
-            f"{baseline_availability:.1f}%"
-        )
-
-    with r2:
-        st.metric(
-            "FlexGrid availability",
-            f"{availability:.1f}%"
-        )
-
-    with r3:
-        st.metric(
-            "Unmet energy reduction",
-            f"{reduction:.1f}%"
-        )
+    st.write("")
 
     fig = go.Figure()
+    line(fig, results["timestamp"], results["baseline_shortfall_kw"],
+         "Baseline shortfall", GREY_LINE, width=2)
+    line(fig, results["timestamp"], results["flexgrid_unmet_kw"],
+         "FlexGrid unmet", YELLOW, width=2.5)
+    style_chart(fig, height=500, y_title="Shortfall (kW)")
+    show(fig)
 
-    fig.add_trace(
-        go.Scatter(
-            x=results["timestamp"],
-            y=results["baseline_shortfall_kw"],
-            name="Baseline shortfall",
-            mode="lines",
-            line=dict(width=2),
-        )
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=results["timestamp"],
-            y=results["flexgrid_unmet_kw"],
-            name="FlexGrid unmet",
-            mode="lines",
-            line=dict(width=2),
-        )
-    )
-
-    fig.update_layout(
-        height=500,
-        hovermode="x unified",
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        xaxis_title="Time",
-        yaxis_title="Shortfall (kW)",
-        margin=dict(l=10, r=10, t=20, b=10),
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-    )
-
-    st.markdown(
-        f"""
-        <div class="insight">
-            <div class="insight-title">
-                What this shows
-            </div>
-            <div class="insight-text">
-                The blue baseline represents unmet demand without
-                coordinated flexibility. The FlexGrid curve represents
-                the remaining unmet demand after the controller uses
-                flexible loads and community battery storage.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    insight(
+        "What this shows",
+        "The grey line is unmet demand without coordinated flexibility. "
+        "The yellow line is the unmet demand that remains after the controller "
+        "uses flexible loads and community battery storage.",
     )
 
 
@@ -752,112 +550,31 @@ elif page == "Reliability":
 
 elif page == "Battery":
 
-    st.markdown(
-        '<div class="section-title">Community Battery</div>',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        """
-        <div class="section-description">
-        Monitor battery state of charge and dispatch decisions
-        throughout the simulation.
-        </div>
-        """,
-        unsafe_allow_html=True,
+    section(
+        "Community battery",
+        "Battery state of charge and dispatch decisions throughout the simulation.",
     )
 
     b1, b2, b3 = st.columns(3)
+    b1.metric("Minimum SOC", f"{min_soc:.1f}%")
+    b2.metric("Maximum SOC", f"{max_soc:.1f}%")
+    b3.metric("Battery discharge", f"{metric_value('Total battery discharge (kWh)'):.1f} kWh")
 
-    with b1:
-        st.metric(
-            "Minimum SOC",
-            f"{min_soc:.1f}%"
-        )
-
-    with b2:
-        st.metric(
-            "Maximum SOC",
-            f"{max_soc:.1f}%"
-        )
-
-    with b3:
-        st.metric(
-            "Battery discharge",
-            f"{metric_value('Total battery discharge (kWh)'):.1f} kWh"
-        )
-
-    # SOC
+    st.write("")
 
     fig = go.Figure()
+    line(fig, results["timestamp"], results["battery_soc"] * 100,
+         "Battery SOC", YELLOW, fill="tozeroy")
+    style_chart(fig, "Battery state of charge", 420, "SOC (%)", [0, 100])
+    show(fig)
 
-    fig.add_trace(
-        go.Scatter(
-            x=results["timestamp"],
-            y=results["battery_soc"] * 100,
-            name="Battery SOC",
-            mode="lines",
-            line=dict(width=2.5),
-            fill="tozeroy",
-        )
-    )
-
-    fig.update_layout(
-        title="Battery State of Charge",
-        height=420,
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        hovermode="x unified",
-        yaxis_title="SOC (%)",
-        xaxis_title="Time",
-        yaxis=dict(range=[0, 100]),
-        margin=dict(l=10, r=10, t=50, b=10),
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-    )
-
-    # Dispatch
+    st.write("")
 
     fig = go.Figure()
-
-    fig.add_trace(
-        go.Scatter(
-            x=results["timestamp"],
-            y=results["battery_charge_kw"],
-            name="Charging",
-            mode="lines",
-            line=dict(width=2),
-        )
-    )
-
-    fig.add_trace(
-        go.Scatter(
-            x=results["timestamp"],
-            y=results["battery_discharge_kw"],
-            name="Discharging",
-            mode="lines",
-            line=dict(width=2),
-        )
-    )
-
-    fig.update_layout(
-        title="Battery Dispatch",
-        height=420,
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        hovermode="x unified",
-        yaxis_title="Power (kW)",
-        xaxis_title="Time",
-        margin=dict(l=10, r=10, t=50, b=10),
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-    )
+    line(fig, results["timestamp"], results["battery_charge_kw"], "Charging", GREEN, width=2)
+    line(fig, results["timestamp"], results["battery_discharge_kw"], "Discharging", INK, width=2)
+    style_chart(fig, "Battery dispatch", 420, "Power (kW)")
+    show(fig)
 
 
 # ============================================================
@@ -866,79 +583,29 @@ elif page == "Battery":
 
 elif page == "Flexible Loads":
 
-    st.markdown(
-        '<div class="section-title">Flexible Demand</div>',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        """
-        <div class="section-description">
-        Flexible electricity demand can be shifted away from
-        renewable shortfall periods while preserving critical loads.
-        </div>
-        """,
-        unsafe_allow_html=True,
+    section(
+        "Flexible demand",
+        "Flexible electricity demand can be shifted away from renewable "
+        "shortfall periods while preserving critical loads.",
     )
 
     f1, f2 = st.columns(2)
+    f1.metric("Total shifted load", f"{shifted_load:.1f} kWh")
+    f2.metric("Peak demand", f"{peak_demand:.1f} kW")
 
-    with f1:
-        st.metric(
-            "Total shifted load",
-            f"{shifted_load:.1f} kWh"
-        )
-
-    with f2:
-        st.metric(
-            "Peak demand",
-            f"{peak_demand:.1f} kW"
-        )
+    st.write("")
 
     fig = go.Figure()
+    line(fig, results["timestamp"], results["load_shift_kw"],
+         "Flexible load shifted", YELLOW, fill="tozeroy")
+    style_chart(fig, "Flexible load shifting", 450, "Shifted power (kW)")
+    show(fig)
 
-    fig.add_trace(
-        go.Scatter(
-            x=results["timestamp"],
-            y=results["load_shift_kw"],
-            name="Flexible load shifted",
-            mode="lines",
-            line=dict(width=2.5),
-            fill="tozeroy",
-        )
-    )
-
-    fig.update_layout(
-        title="Flexible Load Shifting",
-        height=450,
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        hovermode="x unified",
-        xaxis_title="Time",
-        yaxis_title="Shifted Power (kW)",
-        margin=dict(l=10, r=10, t=50, b=10),
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-    )
-
-    st.markdown(
-        """
-        <div class="insight">
-            <div class="insight-title">
-                Demand-side flexibility
-            </div>
-            <div class="insight-text">
-                FlexGrid temporarily shifts eligible electricity
-                consumption during shortage periods. Examples include
-                EV charging, water pumping and other deferrable loads.
-                Critical loads are not intentionally shifted.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    insight(
+        "Demand-side flexibility",
+        "FlexGrid temporarily shifts eligible electricity consumption during "
+        "shortage periods. Examples include EV charging, water pumping and other "
+        "deferrable loads. Critical loads are not intentionally shifted.",
     )
 
 
@@ -948,28 +615,12 @@ elif page == "Flexible Loads":
 
 elif page == "Simulation Data":
 
-    st.markdown(
-        '<div class="section-title">Simulation Data</div>',
-        unsafe_allow_html=True,
-    )
+    section("Simulation data", "Raw simulation output used to generate the dashboard metrics.")
 
-    st.markdown(
-        """
-        <div class="section-description">
-        Raw simulation output used to generate the dashboard metrics.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.dataframe(
-        results,
-        use_container_width=True,
-        height=550,
-    )
+    st.dataframe(results, use_container_width=True, height=550)
 
     st.download_button(
-        label="Download Simulation CSV",
+        label="Download simulation CSV",
         data=results.to_csv(index=False).encode("utf-8"),
         file_name="flexgrid_simulation_results.csv",
         mime="text/csv",
@@ -981,11 +632,7 @@ elif page == "Simulation Data":
 # ============================================================
 
 st.markdown(
-    """
-    <div class="footer">
-        FLEXGRID · Neighbourhood Energy Flexibility
-        · Simulation Prototype · Yuva Yodha 2026
-    </div>
-    """,
+    '<div class="footer">FlexGrid · Neighbourhood Energy Flexibility · '
+    'Simulation Prototype · Yuva Yodha 2026</div>',
     unsafe_allow_html=True,
 )
